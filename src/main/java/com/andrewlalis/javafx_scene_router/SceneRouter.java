@@ -7,14 +7,14 @@ import javafx.scene.layout.Pane;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
 /**
  * A router that shows different content in a pane depending on which route is
- * selected. Each router must be initialized with a JavaFX pane, or a consumer
- * function that's called to set the content each time a new route is selected.
+ * selected.
  * <p>
  *     The router has a mapping of "routes" (think, Strings) to JavaFX Parent
  *     nodes. When a route is selected, the router will lookup the mapped node,
@@ -26,29 +26,14 @@ import java.util.function.Consumer;
  * </p>
  */
 public class SceneRouter {
-    private final Consumer<Parent> setter;
+    private final Pane viewPane = new Pane();
     private final Map<String, Parent> routeMap = new HashMap<>();
     private final RouteHistory history = new RouteHistory();
 
     /**
-     * Constructs the router to show route content in the given pane.
-     * @param pane The pane to show route content in.
+     * Constructs the router.
      */
-    public SceneRouter(Pane pane) {
-        this(p -> pane.getChildren().setAll(p));
-    }
-
-    /**
-     * Constructs the router to supply route content to the given consumer, so
-     * that it may place the content somewhere. For example, you might like to
-     * use this if you'd like to have a router place content in the center of a
-     * {@link javafx.scene.layout.BorderPane}, like so:
-     * <p><code>var router = new SceneRouter(myBorderPane::setCenter);</code></p>
-     * @param setter The consumer that is supplied route content to show.
-     */
-    public SceneRouter(Consumer<Parent> setter) {
-        this.setter = setter;
-    }
+    public SceneRouter() {}
 
     /**
      * Maps the given route to a node, so that when the route is selected, the
@@ -71,7 +56,7 @@ public class SceneRouter {
      *                             may be null.
      * @return This router.
      */
-    public SceneRouter map(String route, String fxml, Consumer<?> controllerCustomizer) {
+    public SceneRouter map(String route, URL fxml, Consumer<?> controllerCustomizer) {
         return map(route, loadNode(fxml, controllerCustomizer));
     }
 
@@ -81,7 +66,7 @@ public class SceneRouter {
      * @param fxml The FXML classpath resource to load from.
      * @return This router.
      */
-    public SceneRouter map(String route, String fxml) {
+    public SceneRouter map(String route, URL fxml) {
         return map(route, fxml, null);
     }
 
@@ -93,7 +78,7 @@ public class SceneRouter {
     public void navigate(String route, Object context) {
         Platform.runLater(() -> {
             history.push(route, context);
-            setter.accept(getMappedNode(route));
+            setCurrentNode(getMappedNode(route));
         });
     }
 
@@ -110,7 +95,7 @@ public class SceneRouter {
      */
     public void navigateBack() {
         Platform.runLater(() -> history.back()
-                .ifPresent(prev -> setter.accept(getMappedNode(prev.route())))
+                .ifPresent(prev -> setCurrentNode(getMappedNode(prev.route())))
         );
     }
 
@@ -119,7 +104,7 @@ public class SceneRouter {
      */
     public void navigateForward() {
         Platform.runLater(() -> history.forward()
-                .ifPresent(next -> setter.accept(getMappedNode(next.route())))
+                .ifPresent(next -> setCurrentNode(getMappedNode(next.route())))
         );
     }
 
@@ -140,19 +125,32 @@ public class SceneRouter {
         return history;
     }
 
+    /**
+     * Gets the view pane that this router renders to. Take this and put it
+     * somewhere in your view's hierarchy to show the router's content.
+     * @return The router's view pane.
+     */
+    public Pane getViewPane() {
+        return viewPane;
+    }
+
     private Parent getMappedNode(String route) {
         Parent node = routeMap.get(route);
         if (node == null) throw new IllegalArgumentException("Route " + route + " is not mapped to any node.");
         return node;
     }
 
-    private <T> Parent loadNode(String fxml, Consumer<T> controllerCustomizer) {
-        FXMLLoader loader = new FXMLLoader(SceneRouter.class.getResource(fxml));
+    private void setCurrentNode(Parent node) {
+        viewPane.getChildren().setAll(node);
+    }
+
+    private <T> Parent loadNode(URL resource, Consumer<T> controllerCustomizer) {
+        FXMLLoader loader = new FXMLLoader(resource);
         try {
             Parent p = loader.load();
             if (controllerCustomizer != null) {
                 T controller = loader.getController();
-                if (controller == null) throw new IllegalStateException("No controller found when loading " + fxml);
+                if (controller == null) throw new IllegalStateException("No controller found when loading " + resource.toString());
                 controllerCustomizer.accept(controller);
             }
             return p;
