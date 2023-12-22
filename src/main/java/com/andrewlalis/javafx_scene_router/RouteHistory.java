@@ -124,4 +124,20 @@ public class RouteHistory {
         }
         return breadCrumbs;
     }
+
+    /**
+     * Gets an unmodifiable view of the items in this history.
+     * @return This history's items.
+     */
+    public List<RouteHistoryItem> getItems() {
+        return Collections.unmodifiableList(items);
+    }
+
+    /**
+     * Gets the current item index.
+     * @return The current item index.
+     */
+    public int getCurrentItemIndex() {
+        return currentItemIndex;
+    }
 }
