@@ -5,4 +5,4 @@ package com.andrewlalis.javafx_scene_router;
  * @param route The route.
  * @param context The context object associated with the route.
  */
-record RouteHistoryItem(String route, Object context) {}
+public record RouteHistoryItem(String route, Object context) {}
