@@ -24,6 +24,11 @@ import java.util.function.Consumer;
  *     The router maintains a {@link RouteHistory} so that it's possible to
  *     navigate backward and forward, much like a web browser would.
  * </p>
+ * <p>
+ *     Note that this router is intended to be used by a single JavaFX
+ *     application, and is <strong>not threadsafe!</strong> Use a separate
+ *     router for each separate JavaFX application you create.
+ * </p>
  */
 public class SceneRouter {
     private final Pane viewPane = new Pane();
