@@ -14,7 +14,7 @@ for that purpose, I've created javafx-scene-router. It allows you to initialize
 a router that controls the content of a Pane or similar, and depending on what
 route is selected, different content will be shown in that pane.
 
-# Usage
+## Usage
 
 Add the following dependency to your `pom.xml`:
 ```xml
@@ -83,3 +83,22 @@ public class MainController {
     }
 }
 ```
+
+## Reactivity
+
+The SceneRouter has been designed to be used in reactive JavaFX projects, and
+includes a few ways of doing this:
+
+- The `currentRouteProperty` can be bound to, or have a listener attached, to
+update each time the current route changes.
+- You can `getBreadCrumbs()` to get an observable list of breadcrumbs that
+changes each time the route's history changes.
+- You can use `addRouteChangeListener` to add a listener that's notified each
+time the route has changed, with additional context and the previous route.
+- You can use `addRouteSelectionListener` to add a listener for a specific
+route, that will be notified only when the router selects that route.
+- You can make any of your controllers for route nodes implement `RouteSelectionListener`,
+in which case they'll automatically be registered using `addRouteSelectionListener`.
+Note that this **does not** apply to routes mapped using a pre-loaded node, as
+in the `map(String route, Parent node)` method. Only methods which take a `URL`
+to a resource work with this.

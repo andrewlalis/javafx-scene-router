@@ -1,8 +1,9 @@
 package com.andrewlalis.javafx_scene_router;
 
 import javafx.application.Platform;
-import javafx.beans.property.ListProperty;
-import javafx.beans.property.SimpleListProperty;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
+import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
@@ -11,8 +12,7 @@ import javafx.scene.layout.Pane;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URL;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Consumer;
 
 /**
@@ -34,10 +34,18 @@ import java.util.function.Consumer;
  * </p>
  */
 public class SceneRouter {
+    public interface RouteChangeListener {
+        void routeChanged(String route, Object context, String oldRoute, Object oldContext);
+    }
+
     private final Pane viewPane = new Pane();
     private final Map<String, Parent> routeMap = new HashMap<>();
     private final RouteHistory history = new RouteHistory();
-    private final ListProperty<BreadCrumb> breadCrumbs = new SimpleListProperty<>();
+    private final ObservableList<BreadCrumb> breadCrumbs = FXCollections.observableArrayList();
+    private final StringProperty currentRouteProperty = new SimpleStringProperty(null);
+
+    private final List<RouteChangeListener> routeChangeListeners = new ArrayList<>();
+    private final Map<String, List<RouteSelectionListener>> routeSelectionListeners = new HashMap<>();
 
     /**
      * Constructs the router.
@@ -47,6 +55,14 @@ public class SceneRouter {
     /**
      * Maps the given route to a node, so that when the route is selected, the
      * given node is shown.
+     * <p>
+     *     Note that by supplying a pre-loaded JavaFX node, the SceneRouter is
+     *     no longer able to check if the node's controller implements
+     *     {@link RouteSelectionListener}, and so you'll need to register the
+     *     controller manually with {@link #addRouteSelectionListener(String, RouteSelectionListener)}
+     *     in order to have the controller be notified when its contents are
+     *     shown.
+     * </p>
      * @param route The route.
      * @param node The node to show.
      * @return This router.
@@ -66,7 +82,7 @@ public class SceneRouter {
      * @return This router.
      */
     public SceneRouter map(String route, URL fxml, Consumer<?> controllerCustomizer) {
-        return map(route, loadNode(fxml, controllerCustomizer));
+        return map(route, loadNode(route, fxml, controllerCustomizer));
     }
 
     /**
@@ -85,9 +101,11 @@ public class SceneRouter {
      * @param context The context that should be available at that route.
      */
     public void navigate(String route, Object context) {
+        String oldRoute = currentRouteProperty.get();
+        Object oldContext = history.getCurrentContext();
         Platform.runLater(() -> {
             history.push(route, context);
-            setCurrentNode(getMappedNode(route));
+            setCurrentNode(route, oldRoute, oldContext);
         });
     }
 
@@ -103,18 +121,18 @@ public class SceneRouter {
      * Attempts to navigate back.
      */
     public void navigateBack() {
-        Platform.runLater(() -> history.back()
-                .ifPresent(prev -> setCurrentNode(getMappedNode(prev.route())))
-        );
+        String oldRoute = currentRouteProperty.get();
+        Object oldContext = history.getCurrentContext();
+        Platform.runLater(() -> history.back().ifPresent(prev -> setCurrentNode(prev.route(), oldRoute, oldContext)));
     }
 
     /**
      * Attempts to navigate forward.
      */
     public void navigateForward() {
-        Platform.runLater(() -> history.forward()
-                .ifPresent(next -> setCurrentNode(getMappedNode(next.route())))
-        );
+        String oldRoute = currentRouteProperty.get();
+        Object oldContext = history.getCurrentContext();
+        Platform.runLater(() -> history.forward().ifPresent(next -> setCurrentNode(next.route(), oldRoute, oldContext)));
     }
 
     /**
@@ -144,12 +162,39 @@ public class SceneRouter {
     }
 
     /**
+     * Gets a property that refers to the router's current route.
+     * @return The route property.
+     */
+    public StringProperty currentRouteProperty() {
+        return currentRouteProperty;
+    }
+
+    /**
      * Gets an observable list of {@link BreadCrumb} that is updated each time
      * the router's navigation history is updated.
      * @return The list of breadcrumbs.
      */
     public ObservableList<BreadCrumb> getBreadCrumbs() {
         return breadCrumbs;
+    }
+
+    /**
+     * Adds a listener that will be notified each time the current route changes.
+     * @param listener The listener that will be notified.
+     */
+    public void addRouteChangeListener(RouteChangeListener listener) {
+        routeChangeListeners.add(listener);
+    }
+
+    /**
+     * Adds a listener that will be notified when the route changes to a
+     * specified route.
+     * @param route The route to listen for.
+     * @param listener The listener to use.
+     */
+    public void addRouteSelectionListener(String route, RouteSelectionListener listener) {
+        List<RouteSelectionListener> listenerList = routeSelectionListeners.computeIfAbsent(route, s -> new ArrayList<>());
+        listenerList.add(listener);
     }
 
     private Parent getMappedNode(String route) {
@@ -161,19 +206,31 @@ public class SceneRouter {
     /**
      * Internal method to actually set this router's view pane to a particular
      * node. This is called any time a route changes.
-     * @param node The node to set.
+     * @param route The route to go to.
+     * @param oldRoute The previous route that the router was at.
+     * @param oldContext The context of the previous route.
      */
-    private void setCurrentNode(Parent node) {
-        viewPane.getChildren().setAll(node);
+    private void setCurrentNode(String route, String oldRoute, Object oldContext) {
+        viewPane.getChildren().setAll(getMappedNode(route));
         breadCrumbs.setAll(history.getBreadCrumbs());
+        currentRouteProperty.set(route);
+        for (var listener : routeChangeListeners) {
+            listener.routeChanged(route, getContext(), oldRoute, oldContext);
+        }
+        for (var listener : routeSelectionListeners.getOrDefault(route, Collections.emptyList())) {
+            listener.onRouteSelected(getContext());
+        }
     }
 
-    private <T> Parent loadNode(URL resource, Consumer<T> controllerCustomizer) {
+    private <T> Parent loadNode(String route, URL resource, Consumer<T> controllerCustomizer) {
         FXMLLoader loader = new FXMLLoader(resource);
         try {
             Parent p = loader.load();
+            T controller = loader.getController();
+            if (controller instanceof RouteSelectionListener rsl) {
+                addRouteSelectionListener(route, rsl);
+            }
             if (controllerCustomizer != null) {
-                T controller = loader.getController();
                 if (controller == null) throw new IllegalStateException("No controller found when loading " + resource.toString());
                 controllerCustomizer.accept(controller);
             }
