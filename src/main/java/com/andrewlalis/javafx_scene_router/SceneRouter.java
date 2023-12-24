@@ -1,6 +1,9 @@
 package com.andrewlalis.javafx_scene_router;
 
 import javafx.application.Platform;
+import javafx.beans.property.ListProperty;
+import javafx.beans.property.SimpleListProperty;
+import javafx.collections.ObservableList;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.layout.Pane;
@@ -34,6 +37,7 @@ public class SceneRouter {
     private final Pane viewPane = new Pane();
     private final Map<String, Parent> routeMap = new HashMap<>();
     private final RouteHistory history = new RouteHistory();
+    private final ListProperty<BreadCrumb> breadCrumbs = new SimpleListProperty<>();
 
     /**
      * Constructs the router.
@@ -139,14 +143,29 @@ public class SceneRouter {
         return viewPane;
     }
 
+    /**
+     * Gets an observable list of {@link BreadCrumb} that is updated each time
+     * the router's navigation history is updated.
+     * @return The list of breadcrumbs.
+     */
+    public ObservableList<BreadCrumb> getBreadCrumbs() {
+        return breadCrumbs;
+    }
+
     private Parent getMappedNode(String route) {
         Parent node = routeMap.get(route);
         if (node == null) throw new IllegalArgumentException("Route " + route + " is not mapped to any node.");
         return node;
     }
 
+    /**
+     * Internal method to actually set this router's view pane to a particular
+     * node. This is called any time a route changes.
+     * @param node The node to set.
+     */
     private void setCurrentNode(Parent node) {
         viewPane.getChildren().setAll(node);
+        breadCrumbs.setAll(history.getBreadCrumbs());
     }
 
     private <T> Parent loadNode(URL resource, Consumer<T> controllerCustomizer) {
