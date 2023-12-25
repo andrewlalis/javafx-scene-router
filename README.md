@@ -46,20 +46,23 @@ public class MyJavaFXApp extends Application {
 }
 ```
 
-From here, it's just a matter of attaching the router's view pane to one of
+From here, it's just a matter of attaching the router's view to one of
 your scene's nodes, and mapping string route names to other nodes or FXML
 files.
 
 For example, suppose my app has a main scene with a `MainController` class.
-We'd hook up the router's view pane to that scene's center view:
+We'd hook up the router's view to that scene's center view, assuming you're
+using an AnchorPaneRouterView for your router (the default choice).
+
 ```java
 public class MainController {
     @FXML
     public BorderPane borderPane;
-    
+
     @FXML
     public void initialize() {
-        borderPane.setCenter(MyJavaFXApp.router.getViewPane());
+        AnchorPaneRouterView view = (AnchorPaneRouterView) MyJavaFXApp.router.getView();
+        borderPane.setCenter(view.getAnchorPane());
     }
 }
 ```

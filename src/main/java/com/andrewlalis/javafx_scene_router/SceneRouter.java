@@ -7,7 +7,6 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
-import javafx.scene.layout.Pane;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -21,7 +20,7 @@ import java.util.function.Consumer;
  * <p>
  *     The router has a mapping of "routes" (think, Strings) to JavaFX Parent
  *     nodes. When a route is selected, the router will lookup the mapped node,
- *     and put that node into the pre-defined pane or consumer function.
+ *     and put that node into its configured {@link RouterView} implementation.
  * </p>
  * <p>
  *     The router maintains a {@link RouteHistory} so that it's possible to
@@ -34,11 +33,7 @@ import java.util.function.Consumer;
  * </p>
  */
 public class SceneRouter {
-    public interface RouteChangeListener {
-        void routeChanged(String route, Object context, String oldRoute, Object oldContext);
-    }
-
-    private final Pane viewPane = new Pane();
+    private final RouterView view;
     private final Map<String, Parent> routeMap = new HashMap<>();
     private final RouteHistory history = new RouteHistory();
     private final ObservableList<BreadCrumb> breadCrumbs = FXCollections.observableArrayList();
@@ -48,9 +43,19 @@ public class SceneRouter {
     private final Map<String, List<RouteSelectionListener>> routeSelectionListeners = new HashMap<>();
 
     /**
-     * Constructs the router.
+     * Constructs the router with a given router view.
+     * @param view The view that will display the router's current route contents.
      */
-    public SceneRouter() {}
+    public SceneRouter(RouterView view) {
+        this.view = view;
+    }
+
+    /**
+     * Constructs the router with a default {@link AnchorPaneRouterView}.
+     */
+    public SceneRouter() {
+        this(new AnchorPaneRouterView(true));
+    }
 
     /**
      * Maps the given route to a node, so that when the route is selected, the
@@ -153,12 +158,11 @@ public class SceneRouter {
     }
 
     /**
-     * Gets the view pane that this router renders to. Take this and put it
-     * somewhere in your view's hierarchy to show the router's content.
-     * @return The router's view pane.
+     * Gets the view used by this router.
+     * @return The router's view.
      */
-    public Pane getViewPane() {
-        return viewPane;
+    public RouterView getView() {
+        return view;
     }
 
     /**
@@ -211,7 +215,7 @@ public class SceneRouter {
      * @param oldContext The context of the previous route.
      */
     private void setCurrentNode(String route, String oldRoute, Object oldContext) {
-        viewPane.getChildren().setAll(getMappedNode(route));
+        view.showRouteNode(getMappedNode(route));
         breadCrumbs.setAll(history.getBreadCrumbs());
         currentRouteProperty.set(route);
         for (var listener : routeChangeListeners) {
