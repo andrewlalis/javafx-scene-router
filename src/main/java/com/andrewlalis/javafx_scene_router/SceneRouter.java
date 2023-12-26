@@ -164,6 +164,7 @@ public class SceneRouter {
                     CompletableFuture<Boolean> cf = new CompletableFuture<>();
                     Platform.runLater(() -> {
                         history.clearForward();
+                        breadCrumbs.setAll(history.getBreadCrumbs());
                         cf.complete(true);
                     });
                     return cf;
