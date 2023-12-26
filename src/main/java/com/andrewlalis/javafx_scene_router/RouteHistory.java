@@ -106,6 +106,16 @@ public class RouteHistory {
     }
 
     /**
+     * Clears any history ahead of the current route item, such that the user
+     * cannot navigate forward.
+     */
+    public void clearForward() {
+        if (currentItemIndex + 1 < items.size()) {
+            items.subList(currentItemIndex + 1, items.size()).clear();
+        }
+    }
+
+    /**
      * Gets a list of "breadcrumbs", or a representation of the current history
      * and indication of where we are in that history.
      * @return The list of breadcrumbs.
@@ -139,5 +149,21 @@ public class RouteHistory {
      */
     public int getCurrentItemIndex() {
         return currentItemIndex;
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder("RouteHistory:\n");
+        for (int i = 0; i < items.size(); i++) {
+            var item = items.get(i);
+            sb.append(String.format("%4d route = \"%s\", context = %s", i, item.route(), item.context()));
+            if (i == currentItemIndex) {
+                sb.append(" <--- Current Item");
+            }
+            if (i + 1 < items.size()) {
+                sb.append(String.format("%n"));
+            }
+        }
+        return sb.toString();
     }
 }

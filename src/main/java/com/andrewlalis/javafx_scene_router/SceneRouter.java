@@ -12,7 +12,9 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URL;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * A router that shows different content in a pane depending on which route is
@@ -34,7 +36,7 @@ import java.util.function.Consumer;
  */
 public class SceneRouter {
     private final RouterView view;
-    private final Map<String, Parent> routeMap = new HashMap<>();
+    private final Map<String, Supplier<Parent>> routeMap = new HashMap<>();
     private final RouteHistory history = new RouteHistory();
     private final ObservableList<BreadCrumb> breadCrumbs = FXCollections.observableArrayList();
     private final StringProperty currentRouteProperty = new SimpleStringProperty(null);
@@ -73,7 +75,7 @@ public class SceneRouter {
      * @return This router.
      */
     public SceneRouter map(String route, Parent node) {
-        routeMap.put(route, node);
+        routeMap.put(route, () -> node);
         return this;
     }
 
@@ -104,40 +106,85 @@ public class SceneRouter {
      * Navigates to a given route, with a given context object.
      * @param route The route to navigate to.
      * @param context The context that should be available at that route.
+     * @return A completable future that completes once navigation is done.
      */
-    public void navigate(String route, Object context) {
+    public CompletableFuture<Void> navigate(String route, Object context) {
         String oldRoute = currentRouteProperty.get();
         Object oldContext = history.getCurrentContext();
+        CompletableFuture<Void> cf = new CompletableFuture<>();
         Platform.runLater(() -> {
             history.push(route, context);
             setCurrentNode(route, oldRoute, oldContext);
+            cf.complete(null);
         });
+        return cf;
     }
 
     /**
      * Navigates to a given route, without any context.
      * @param route The route to navigate to.
+     * @return A completable future that completes once navigation is done.
      */
-    public void navigate(String route) {
-        navigate(route, null);
+    public CompletableFuture<Void> navigate(String route) {
+        return navigate(route, null);
     }
 
     /**
-     * Attempts to navigate back.
+     * Attempts to navigate back to the previous route.
+     * @return True if the router will navigate back.
      */
-    public void navigateBack() {
+    public CompletableFuture<Boolean> navigateBack() {
         String oldRoute = currentRouteProperty.get();
         Object oldContext = history.getCurrentContext();
-        Platform.runLater(() -> history.back().ifPresent(prev -> setCurrentNode(prev.route(), oldRoute, oldContext)));
+        if (!history.canGoBack()) return CompletableFuture.completedFuture(false);
+        CompletableFuture<Boolean> cf = new CompletableFuture<>();
+        Platform.runLater(() -> {
+            RouteHistoryItem prev = history.back().orElseThrow();
+            setCurrentNode(prev.route(), oldRoute, oldContext);
+            cf.complete(true);
+        });
+        return cf;
+    }
+
+    /**
+     * Attempts to navigate back to the previous route, and then erase all
+     * forward route history.
+     * <p>
+     *     For example, suppose the history looks like this:<br>
+     *     "A" -> "B" -> "C"<br>
+     *     where the router is currently at C. Then, if this method is called,
+     *     the router will go back to B, and remove C from the history.
+     * </p>
+     * @return True if the router will navigate back.
+     */
+    public CompletableFuture<Boolean> navigateBackAndClear() {
+        return navigateBack()
+                .thenCompose(success -> {
+                    if (!success) return CompletableFuture.completedFuture(false);
+                    CompletableFuture<Boolean> cf = new CompletableFuture<>();
+                    Platform.runLater(() -> {
+                        history.clearForward();
+                        cf.complete(true);
+                    });
+                    return cf;
+                });
     }
 
     /**
      * Attempts to navigate forward.
+     * @return A future that resolves to true if forward navigation was successful.
      */
-    public void navigateForward() {
+    public CompletableFuture<Boolean> navigateForward() {
         String oldRoute = currentRouteProperty.get();
         Object oldContext = history.getCurrentContext();
-        Platform.runLater(() -> history.forward().ifPresent(next -> setCurrentNode(next.route(), oldRoute, oldContext)));
+        if (!history.canGoForward()) return CompletableFuture.completedFuture(false);
+        CompletableFuture<Boolean> cf = new CompletableFuture<>();
+        Platform.runLater(() -> {
+            RouteHistoryItem next = history.forward().orElseThrow();
+            setCurrentNode(next.route(), oldRoute, oldContext);
+            cf.complete(true);
+        });
+        return cf;
     }
 
     /**
@@ -202,7 +249,7 @@ public class SceneRouter {
     }
 
     private Parent getMappedNode(String route) {
-        Parent node = routeMap.get(route);
+        Parent node = routeMap.get(route).get();
         if (node == null) throw new IllegalArgumentException("Route " + route + " is not mapped to any node.");
         return node;
     }

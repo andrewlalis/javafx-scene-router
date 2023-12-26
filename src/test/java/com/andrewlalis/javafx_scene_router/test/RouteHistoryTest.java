@@ -1,5 +1,8 @@
-package com.andrewlalis.javafx_scene_router;
+package com.andrewlalis.javafx_scene_router.test;
 
+import com.andrewlalis.javafx_scene_router.RouteHistory;
+import com.andrewlalis.javafx_scene_router.RouteHistoryItem;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -39,7 +42,7 @@ public class RouteHistoryTest {
         assertTrue(history.canGoBack());
         var prev = history.back();
         assertTrue(prev.isPresent());
-        assertEquals(new RouteHistoryItem("a", "a"), prev.get());
+        Assertions.assertEquals(new RouteHistoryItem("a", "a"), prev.get());
         assertFalse(history.canGoBack());
         assertTrue(history.back().isEmpty());
     }
@@ -71,6 +74,22 @@ public class RouteHistoryTest {
         assertNull(history.getCurrentContext());
         assertTrue(history.getItems().isEmpty());
         assertEquals(-1, history.getCurrentItemIndex());
+    }
+
+    @Test
+    public void testClearForward() {
+        var history = new RouteHistory();
+        history.push("a", "a");
+        history.push("b", "b");
+        history.push("c", "c");
+        assertEquals(3, history.getItems().size());
+        assertEquals(2, history.getCurrentItemIndex());
+        history.back();
+        assertEquals(3, history.getItems().size());
+        assertEquals(1, history.getCurrentItemIndex());
+        history.clearForward();
+        assertEquals(1, history.getCurrentItemIndex());
+        assertEquals(2, history.getItems().size());
     }
 
     @Test
