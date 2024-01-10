@@ -7,8 +7,7 @@ import javafx.scene.layout.AnchorPane;
  * A router view implementation using the JavaFX {@link AnchorPane}, so that
  * route contents can (optionally) be grown to fill all available space.
  */
-public class AnchorPaneRouterView implements RouterView {
-    private final AnchorPane anchorPane = new AnchorPane();
+public class AnchorPaneRouterView extends SimpleRouterView<AnchorPane> {
     private final boolean expandContents;
 
     /**
@@ -18,6 +17,7 @@ public class AnchorPaneRouterView implements RouterView {
      *                       fill all available space.
      */
     public AnchorPaneRouterView(boolean expandContents) {
+        super(new AnchorPane());
         this.expandContents = expandContents;
     }
 
@@ -43,14 +43,6 @@ public class AnchorPaneRouterView implements RouterView {
             AnchorPane.setBottomAnchor(node, 0.0);
             AnchorPane.setLeftAnchor(node, 0.0);
         }
-        anchorPane.getChildren().setAll(node);
-    }
-
-    /**
-     * Gets the underlying pane used for rendering.
-     * @return The anchor pane this view uses.
-     */
-    public AnchorPane getAnchorPane() {
-        return anchorPane;
+        super.showRouteNode(node);
     }
 }

@@ -6,7 +6,7 @@
 
     <groupId>com.andrewlalis</groupId>
     <artifactId>javafx-scene-router</artifactId>
-    <version>1.5.1</version>
+    <version>1.6.0</version>
     <name>JavaFX Scene Router</name>
     <description>A library that provides a router implementation for JavaFX, for browser-like navigation between pages.</description>
     <url>https://github.com/andrewlalis/javafx-scene-router</url>

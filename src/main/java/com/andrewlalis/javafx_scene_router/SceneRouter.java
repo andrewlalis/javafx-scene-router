@@ -103,6 +103,23 @@ public class SceneRouter {
     }
 
     /**
+     * "Warms up" the route cache by calling each route's supplier once. This
+     * will cause FXML resources to be loaded, such that all subsequent loads
+     * are much faster.
+     * @return A future that's complete once all routes are loaded.
+     */
+    public CompletableFuture<Void> loadAllRoutes() {
+        CompletableFuture<Void> cf = new CompletableFuture<>();
+        Thread.ofVirtual().start(() -> {
+            for (Supplier<Parent> nodeSupplier : routeMap.values()) {
+                nodeSupplier.get();
+            }
+            cf.complete(null);
+        });
+        return cf;
+    }
+
+    /**
      * Navigates to a given route, with a given context object.
      * @param route The route to navigate to.
      * @param context The context that should be available at that route.
@@ -186,6 +203,34 @@ public class SceneRouter {
             cf.complete(true);
         });
         return cf;
+    }
+
+    /**
+     * Navigates to the given route, clearing any previous history.
+     * @param route The route to navigate to.
+     * @param context The context for the route.
+     * @return A future that resolves once navigation is complete.
+     */
+    public CompletableFuture<Void> replace(String route, Object context) {
+        String oldRoute = currentRouteProperty.get();
+        Object oldContext = history.getCurrentContext();
+        CompletableFuture<Void> cf = new CompletableFuture<>();
+        Platform.runLater(() -> {
+            history.clear();
+            history.push(route, context);
+            setCurrentNode(route, oldRoute, oldContext);
+            cf.complete(null);
+        });
+        return cf;
+    }
+
+    /**
+     * Navigates to the given route, clearing any previous history.
+     * @param route The route to navigate to.
+     * @return A future that resolves once navigation is complete.
+     */
+    public CompletableFuture<Void> replace(String route) {
+        return replace(route, null);
     }
 
     /**
@@ -281,6 +326,9 @@ public class SceneRouter {
             T controller = loader.getController();
             if (controller instanceof RouteSelectionListener rsl) {
                 addRouteSelectionListener(route, rsl);
+            }
+            if (controller instanceof RouteChangeListener rcl) {
+                addRouteChangeListener(rcl);
             }
             if (controllerCustomizer != null) {
                 if (controller == null) throw new IllegalStateException("No controller found when loading " + resource.toString());
